@@ -9,6 +9,7 @@ from rich.prompt import Confirm
 from .editor import Editor
 from .terminal import Terminal
 from .ui import console, ok, warn
+from .agent import Agent
 
 
 @dataclass
@@ -25,9 +26,11 @@ class ToolRouter:
         self,
         terminal: Terminal,
         editor: Editor,
+        agent: Agent,
     ) -> None:
         self.terminal = terminal
         self.editor = editor
+        self.agent = agent
 
     def handle(self, text: str) -> ToolResult:
         if self._handle_workspace_action(text):

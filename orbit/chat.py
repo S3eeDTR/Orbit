@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .stats import SessionStats
 from pathlib import Path
+import re
 
 
 from .ui import stream_text, finish_stream
@@ -106,6 +107,98 @@ class ChatSession:
             }
         )   
         return reply
+
+    
+    def complete_once(self, prompt: str) -> str | None:
+        """
+        Get one non-streaming response from the model.
+        Used for internal tasks like generating file edits.
+        """
+
+        if not prompt.strip():
+            return None
+
+        messages = [
+            self.messages[0],
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
+
+        try:
+            data = self.client.chat(self.model, messages)
+
+        except OpenRouterError as exc:
+            console.print(f"[red]{exc}[/red]")
+            return None
+
+        self.stats.record(data)
+
+        choices = data.get("choices") or []
+
+        if not choices:
+            return None
+
+        message = choices[0].get("message") or {}
+
+        return str(message.get("content") or "").strip()
+
+
+    def generate_file_edit(
+            self,
+            path: str,
+            original_content: str,
+            instruction: str,
+        ) -> str | None:
+        """
+        Ask the model to return the full updated file content.
+        """
+
+        prompt = f"""
+    You are editing a source code file.
+
+    File path:
+    {path}
+
+    User instruction:
+    {instruction}
+
+    Current file content:
+
+    ```text
+    {original_content}
+    ```
+
+    Return ONLY the complete updated file.
+
+    Do not explain anything.
+    Do not use markdown.
+    Do not wrap the response in code fences.
+    """
+
+        reply = self.complete_once(prompt)
+
+        if not reply:
+            return None
+
+        return self._strip_code_fence(reply)
+
+    def _strip_code_fence(self, text: str) -> str:
+        """
+        Remove markdown code fences if the model returns them.
+        """
+
+        match = re.match(
+            r"^```(?:\w+)?\n(.*)\n```$",
+            text.strip(),
+            flags=re.DOTALL,
+        )
+
+        if match:
+            return match.group(1)
+
+        return text
 
     def show_stats(self) -> None:
         self.stats.render(self.model)

@@ -4,6 +4,7 @@ from .banner import render_prompt_hint, render_startup
 from .terminal import Terminal
 from .tool_router import ToolRouter
 from .chat import ChatSession
+from .agent import Agent
 from .client import OpenRouterClient
 from .commands import expand_file_refs, handle_command
 from .config import get_api_key, load_config, save_config
@@ -34,10 +35,7 @@ class OrbitApp:
         self.workspace = Workspace(self.root)
         self.editor = Editor(self.workspace)
         self.terminal = Terminal(self.root)
-        self.tool_router = ToolRouter(
-            self.terminal,
-            self.editor,
-        )
+       
 
         self.project = load_index(self.root)
         save_index(self.project)
@@ -61,6 +59,17 @@ class OrbitApp:
             self.model,
             self.root,
         )
+
+        self.agent = Agent(
+            self.chat,
+            self.editor,
+        )
+        self.tool_router = ToolRouter(
+            self.terminal,
+            self.editor,
+            self.agent,
+        )
+
 
         self.shell = PromptShell(self.project.files)
 

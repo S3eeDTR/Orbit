@@ -3,6 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from .workspace import Workspace
+from dataclasses import dataclass
+
+
+@dataclass
+class EditProposal:
+    path: str
+    original_content: str
+    new_content: str
+    diff: str
 
 
 class Editor:
@@ -15,6 +24,33 @@ class Editor:
 
     def __init__(self, workspace: Workspace) -> None:
         self.workspace = workspace
+
+    # ------------------------------------------------------------------
+    # Propose File Edit
+    # ------------------------------------------------------------------
+    def propose_file_edit(
+        self,
+        path: str | Path,
+        new_content: str,
+    ) -> EditProposal:
+        """
+        Build an edit proposal without modifying the file.
+        """
+
+        original = self.workspace.read_file(path)
+
+        diff = self.workspace.show_diff(
+            original,
+            new_content,
+            filename=str(path),
+        )
+
+        return EditProposal(
+            path=str(path),
+            original_content=original,
+            new_content=new_content,
+            diff=diff,
+        )
 
     # ------------------------------------------------------------------
     # Read
