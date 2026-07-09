@@ -14,12 +14,25 @@ console = Console()
 # ============================================================================
 
 def render_markdown(text: str) -> None:
-    """Render markdown with a plain-text fallback."""
-
+    """Render Markdown with a plain-text fallback."""
     try:
         console.print(Markdown(text))
     except Exception:
         console.print(text)
+
+
+# ============================================================================
+# STREAMING
+# ============================================================================
+
+def stream_text(chunk: str) -> None:
+    """Write one streamed chunk without adding a newline."""
+    console.print(chunk, end="", soft_wrap=True)
+
+
+def finish_stream() -> None:
+    """Finish a streamed response."""
+    console.print()
 
 
 # ============================================================================
@@ -31,7 +44,6 @@ def render_code(
     language: str = "python",
 ) -> None:
     """Render syntax highlighted code."""
-
     console.print(
         Syntax(
             code,
@@ -72,8 +84,6 @@ def panel(
     title: str | None = None,
     border_style: str = "cyan",
 ) -> None:
-    """Display a Rich panel."""
-
     console.print(
         Panel(
             message,
@@ -87,44 +97,28 @@ def info_panel(
     message: str,
     title: str = "Information",
 ) -> None:
-    panel(
-        message,
-        title=title,
-        border_style="cyan",
-    )
+    panel(message, title=title)
 
 
 def success_panel(
     message: str,
     title: str = "Success",
 ) -> None:
-    panel(
-        message,
-        title=title,
-        border_style="green",
-    )
+    panel(message, title=title, border_style="green")
 
 
 def warning_panel(
     message: str,
     title: str = "Warning",
 ) -> None:
-    panel(
-        message,
-        title=title,
-        border_style="yellow",
-    )
+    panel(message, title=title, border_style="yellow")
 
 
 def error_panel(
     message: str,
     title: str = "Error",
 ) -> None:
-    panel(
-        message,
-        title=title,
-        border_style="red",
-    )
+    panel(message, title=title, border_style="red")
 
 
 # ============================================================================
@@ -132,8 +126,6 @@ def error_panel(
 # ============================================================================
 
 def heading(text: str) -> None:
-    """Print a section heading."""
-
     console.rule(
         Text(
             text,
