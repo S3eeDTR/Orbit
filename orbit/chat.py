@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.table import Table
-
+from .ui import stream_text, finish_stream
 from .client import OpenRouterClient, OpenRouterError
 from .project import read_project_instructions
 from .ui import console
@@ -80,9 +80,9 @@ class ChatSession:
         try:
             for chunk in self.client.chat_stream(self.model, self.messages):
                 chunks.append(chunk)
-                console.print(chunk, end="")
+                stream_text(chunk)
 
-            console.print()
+            finish_stream()
 
         except OpenRouterError as exc:
             console.print(f"\n[red]{exc}[/red]")
