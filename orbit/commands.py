@@ -6,6 +6,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .chat import ChatSession
+from .terminal import Terminal
 from .client import OpenRouterClient
 from .config import Config, save_config
 from .models import model_id_from_argument, print_models
@@ -27,6 +28,7 @@ HELP_TEXT = """
   /model <number>   Switch using number from /models
   /model <id>       Switch using exact OpenRouter model ID
   /models           List available models
+  /run <command>    Run terminal commands
   /index            Scan project files
   /files            Show indexed files
   /init             Create ORBIT.md project instructions
@@ -78,6 +80,7 @@ def handle_command(
     config: Config,
     client: OpenRouterClient,
     project: ProjectInfo,
+    terminal: Terminal,
 ) -> bool:
     """Handle slash commands. Return False when the app should exit."""
 
@@ -140,7 +143,25 @@ def handle_command(
             console.print(
                 f"[dim]Showing first 100 of {project.file_count} files.[/dim]"
             )
+    elif command == "/run":
+        if not argument:
+            warn("Usage: /run <command>")
+            return True
 
+        try:
+            result = terminal.run_safe(argument)
+        except Exception as exc:
+            warn(str(exc))
+            return True
+
+        console.print(f"[bold cyan]Command:[/bold cyan] {result.command}")
+        console.print(f"[bold cyan]Exit code:[/bold cyan] {result.exit_code}")
+
+        if result.stdout:
+            console.print(Panel(result.stdout, title="stdout", border_style="green"))
+
+        if result.stderr:
+            console.print(Panel(result.stderr, title="stderr", border_style="red"))
     elif command == "/init":
         path = create_instructions(project.root)
         chat.reset_system_prompt()

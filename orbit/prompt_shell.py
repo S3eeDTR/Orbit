@@ -15,16 +15,32 @@ COMMANDS = [
     "/help",
     "/clear",
     "/stats",
+
+    # Models
     "/model",
     "/models",
+
+    # Project
     "/index",
     "/files",
     "/init",
+
+    # Sessions
     "/save",
+
+    # Future
+    "/tree",      # Show project tree
+    "/search",    # Search files/content
+    "/run",       # Run terminal commands
+    "/git",       # Git shortcuts
+    "/config",    # View/change ORBIT settings
+
+    # Exit
     "/exit",
     "/quit",
-]
 
+    "/run"
+]
 
 class OrbitCompleter(Completer):
     """Autocomplete slash commands and @file references."""

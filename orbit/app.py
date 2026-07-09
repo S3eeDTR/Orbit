@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .banner import render_prompt_hint, render_startup
+from .terminal import Terminal
 from .chat import ChatSession
 from .client import OpenRouterClient
 from .commands import expand_file_refs, handle_command
@@ -31,6 +32,7 @@ class OrbitApp:
 
         self.workspace = Workspace(self.root)
         self.editor = Editor(self.workspace)
+        self.terminal = Terminal(self.root)
 
         self.project = load_index(self.root)
         save_index(self.project)
@@ -88,6 +90,7 @@ class OrbitApp:
                     self.config,
                     self.client,
                     self.project,
+                    self.terminal,
                 )
 
                 if not should_continue:
