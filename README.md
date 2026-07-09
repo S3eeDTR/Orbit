@@ -1,52 +1,68 @@
 # ORBIT
 
-A terminal-first AI coding assistant powered by OpenRouter.
+**A modern terminal-first AI coding assistant powered by OpenRouter.**
 
-ORBIT is an open-source developer CLI inspired by modern AI coding tools such as Claude Code and Gemini CLI. It provides a fast, interactive command-line experience for working with hundreds of large language models through a single interface.
+ORBIT is an open-source AI developer CLI inspired by modern coding assistants such as Claude Code and Gemini CLI. It provides a fast, interactive terminal interface for working with hundreds of large language models through OpenRouter while maintaining a consistent developer experience.
 
-The long-term vision is to build an extensible AI development environment capable of understanding projects, managing context, editing code, executing tools, and supporting complex software engineering workflows.
+The goal of ORBIT is to become a provider-agnostic AI development environment capable of understanding projects, editing code, executing tools, managing long-running conversations, and assisting throughout the complete software development lifecycle.
+
+> **Project Status:** Early Development (v0.1.0)
 
 ---
 
 ## Features
 
-Current capabilities include:
+### Current
 
 - Interactive terminal interface
-- Support for any OpenRouter model
-- Switch models without restarting the session
+- Support for all OpenRouter models
+- Switch models without restarting
 - Conversation history
 - Rich terminal rendering
-- Markdown and syntax-highlighted output
+- Markdown rendering
+- Syntax highlighted code blocks
 - Local configuration management
 - Session statistics
 - Project-aware workflow
-- File reference support (`@file.py`)
+- File references (`@filename.py`)
+
+### Planned
+
+- Streaming responses
+- Project indexing
+- Automatic context retrieval
+- File editing
+- Git integration
+- Tool execution
+- Workspace memory
+- Multi-agent workflows
+- Model Context Protocol (MCP)
+- Plugin architecture
 
 ---
 
-## Installation
+# Installation
 
-Clone the repository:
+Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/orbit.git
-cd orbit
+git clone https://github.com/S3eeDTR/Orbit.git
+cd Orbit
 ```
 
-Install dependencies:
+Install the dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Install ORBIT locally:
+Install ORBIT
 
 ```bash
 pip install -e .
 ```
 
-Run:
+Run
 
 ```bash
 orbit
@@ -54,16 +70,16 @@ orbit
 
 ---
 
-## First Run
+# First Run
 
-The first launch will:
+The first time ORBIT starts it will automatically:
 
-1. Request your OpenRouter API key
-2. Download the latest available models
-3. Allow you to choose a default model
-4. Store your configuration locally
+- Request your OpenRouter API key
+- Download the available model list
+- Let you choose a default model
+- Save your configuration locally
 
-Configuration is stored in:
+Configuration is stored under:
 
 ```
 ~/.config/openrouter-cli/
@@ -71,48 +87,52 @@ Configuration is stored in:
 
 ---
 
-## Commands
+# Commands
 
 | Command | Description |
 |----------|-------------|
 | `/help` | Show available commands |
 | `/models` | List available models |
-| `/model <id>` | Switch to another model |
-| `/clear` | Clear the conversation |
-| `/stats` | Display session statistics |
+| `/model <id>` | Switch models |
+| `/clear` | Clear the current conversation |
+| `/stats` | Show session statistics |
 | `/exit` | Exit ORBIT |
 
 ---
 
-## Working with Files
+# Working With Files
 
-Reference files directly in your prompt.
+Reference project files directly inside your prompts.
 
 ```text
 Explain @main.py
-
-Review @database.py
-
-Refactor @api.py
 ```
 
-Multiple files may be referenced.
+```text
+Review @database.py
+```
 
 ```text
-Compare @old.py with @new.py
+Refactor @client.py
+```
+
+Multiple files can also be referenced.
+
+```text
+Compare @api.py with @api_old.py
 ```
 
 ---
 
-## Model Selection
+# Model Selection
 
-Switch models using either the displayed number
+Models can be selected using either their displayed number
 
 ```text
-/model 15
+/model 12
 ```
 
-or the complete model identifier
+or their complete identifier
 
 ```text
 /model anthropic/claude-opus-4.1
@@ -120,12 +140,13 @@ or the complete model identifier
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```
-orbit/
+Orbit/
 │
-├── openrouter_cli/
+├── orbit/
+│   ├── __init__.py
 │   ├── __main__.py
 │   ├── app.py
 │   ├── banner.py
@@ -136,29 +157,61 @@ orbit/
 │   ├── constants.py
 │   ├── file_context.py
 │   ├── models.py
-│   ├── prompt_shell.py
 │   ├── project.py
+│   ├── prompt_shell.py
 │   ├── sessions.py
 │   └── ui.py
 │
-├── requirements.txt
+├── tests/
+├── README.md
+├── LICENSE
 ├── pyproject.toml
-└── README.md
+├── requirements.txt
+└── .gitignore
 ```
 
 ---
 
-## Roadmap
+# Architecture
 
-### Near Term
+```
+                    Terminal
+                       │
+                       ▼
+             Interactive Prompt
+                       │
+                       ▼
+              Command Dispatcher
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+        ▼                             ▼
+  Conversation Engine          Project Context
+        │                             │
+        └──────────────┬──────────────┘
+                       │
+                       ▼
+               OpenRouter Client
+                       │
+                       ▼
+              OpenRouter REST API
+```
+
+---
+
+# Roadmap
+
+## Version 0.2
 
 - Streaming responses
 - Better markdown rendering
 - Interactive model picker
 - Project indexing
-- Better file context handling
+- Better file context
 
-### Mid Term
+---
+
+## Version 0.3
 
 - Git integration
 - File editing
@@ -166,37 +219,67 @@ orbit/
 - Workspace memory
 - Conversation export
 
-### Long Term
+---
+
+## Version 0.4
 
 - Multi-agent workflows
-- Tool calling
-- Plugin system
-- MCP support
 - Autonomous coding tasks
-- Cross-platform installer
+- Code review agent
+- Documentation generation
+- Test generation
 
 ---
 
-## Why ORBIT?
+## Version 1.0
+
+- Complete AI development environment
+- Plugin system
+- MCP support
+- Long-term memory
+- Cross-platform installer
+- Native package distribution
+
+---
+
+# Technology Stack
+
+- Python 3.11+
+- OpenRouter API
+- Rich
+- prompt_toolkit
+- Requests
+
+---
+
+# Why ORBIT?
 
 Most AI coding assistants are tightly coupled to a single provider.
 
-ORBIT takes a different approach by separating the interface from the model. Through OpenRouter, developers can seamlessly switch between models from OpenAI, Anthropic, Google, Meta, Qwen, DeepSeek, Mistral, and many others without changing tools or workflows.
+ORBIT separates the developer experience from the underlying model, allowing users to switch seamlessly between OpenAI, Anthropic, Google, Meta, Qwen, DeepSeek, Mistral, and many other providers available through OpenRouter without changing workflows.
 
-The goal is to provide a consistent, provider-agnostic development experience while allowing users to choose the model that best fits their task.
+The long-term vision is to build a flexible AI platform where developers choose the best model for each task while keeping a consistent interface and workflow.
 
 ---
 
-## Contributing
+# Contributing
 
 Contributions are welcome.
 
-If you plan to implement a significant feature or architectural change, please open an issue first so it can be discussed before development begins.
+If you plan to implement a significant feature or architectural change, please open an issue first to discuss the proposal before starting development.
 
-Bug reports, documentation improvements, and pull requests are all appreciated.
+Bug reports, documentation improvements, feature requests, and pull requests are all appreciated.
 
 ---
 
-## License
+# Disclaimer
+
+ORBIT is an independent open-source project and is not affiliated with, endorsed by, or sponsored by OpenRouter or any model provider.
+
+---
+
+# License
 
 This project is licensed under the MIT License.
+
+See the LICENSE file for details.
