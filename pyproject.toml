@@ -1,9 +1,10 @@
 [project]
-name = "orbit"
+name = "orbit-code"
 version = "0.1.0"
 description = "A modern terminal-first AI coding assistant powered by OpenRouter."
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
 
 dependencies = [
     "requests>=2.32.0",
@@ -13,3 +14,6 @@ dependencies = [
 
 [project.scripts]
 orbit = "orbit.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["orbit*"]
