@@ -10,6 +10,7 @@ from .planner import Planner
 from .commands import expand_file_refs, handle_command
 from .config import get_api_key, load_config, save_config
 from .constants import APP_DISPLAY_NAME, REQUEST_TIMEOUT
+from .project_map import ProjectMap
 from .editor import Editor
 from .models import choose_default_model
 from .project import load_index, project_root, save_index
@@ -62,9 +63,16 @@ class OrbitApp:
             self.root,
         )
 
+        self.project_map = ProjectMap(
+            self.project,
+            self.workspace,
+            self.chat,
+        )
+
         self.planner = Planner(
             self.project,
-            self.chat,  
+            self.chat,
+            self.project_map,  
         )
 
         self.agent = Agent(

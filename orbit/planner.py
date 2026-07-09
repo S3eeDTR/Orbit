@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .chat import ChatSession
 from .project import ProjectInfo
+from .project_map import ProjectMap
 
 
 @dataclass
@@ -29,9 +30,11 @@ class Planner:
         self,
         project: ProjectInfo,
         chat: ChatSession,
+        project_map: ProjectMap,
     ) -> None:
         self.project = project
         self.chat = chat
+        self.project_map = project_map
 
     def plan_edit(
         self,
@@ -64,7 +67,12 @@ class Planner:
         request: str,
         limit: int = 80,
     ) -> Plan:
-        files = "\n".join(self.project.files[:limit])
+        entries = self.project_map.build(limit)
+
+        files = "\n\n".join(
+            f"{entry.path}\nDescription: {entry.description}"
+            for entry in entries
+        )
 
         prompt = f"""
             You are ORBIT's planning engine.
@@ -79,7 +87,8 @@ class Planner:
 
             Instructions:
 
-            - Select the SMALLEST possible set of files.
+            - Select the smallest practical set of files, usually 1-3 files.
+            - Return at most 3 files unless the request clearly requires more.
             - Include ONLY files that require code changes.
             - Do NOT include files that are merely related.
             - Prefer precision over completeness.
