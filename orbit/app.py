@@ -6,11 +6,13 @@ from .client import OpenRouterClient
 from .commands import expand_file_refs, handle_command
 from .config import get_api_key, load_config, save_config
 from .constants import APP_DISPLAY_NAME, REQUEST_TIMEOUT
+from .editor import Editor
 from .models import choose_default_model
 from .project import load_index, project_root, save_index
 from .prompt_shell import PromptShell
 from .sessions import add_recent, load_recent
 from .ui import console
+from .workspace import Workspace
 
 
 class OrbitApp:
@@ -26,6 +28,10 @@ class OrbitApp:
         )
 
         self.root = project_root()
+
+        self.workspace = Workspace(self.root)
+        self.editor = Editor(self.workspace)
+
         self.project = load_index(self.root)
         save_index(self.project)
 
@@ -87,7 +93,6 @@ class OrbitApp:
                 if not should_continue:
                     break
 
-                # Refresh autocomplete after commands like /index
                 self.shell = PromptShell(self.project.files)
                 continue
 
@@ -96,7 +101,6 @@ class OrbitApp:
                 self.project,
             )
 
-            # Streaming chat
             self.chat.send(expanded_input)
 
     def _verify_api_key(self) -> None:
