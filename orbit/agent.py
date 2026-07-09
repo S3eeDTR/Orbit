@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+
 from rich.prompt import Confirm
 from rich.panel import Panel
 
 from .chat import ChatSession
 from .editor import Editor
+from .planner import Planner
 from .ui import console, ok, warn
 
 
@@ -28,9 +30,11 @@ class Agent:
         self,
         chat: ChatSession,
         editor: Editor,
+        planner: Planner,
     ) -> None:
         self.chat = chat
         self.editor = editor
+        self.planner = planner
 
     def edit_file(
         self,
@@ -41,7 +45,25 @@ class Agent:
         Generate an AI edit, preview the diff,
         and optionally apply it.
         """
+        plan = self.planner.plan_edit(
+            str(path),
+            instruction,
+        )
 
+        console.print("\n[bold cyan]Execution Plan[/bold cyan]")
+
+        console.print(f"[bold]Objective:[/bold] {plan.objective}\n")
+
+        for step in plan.steps:
+            console.print(
+                f"• {step.path} - {step.reason}"
+            )
+
+        if not Confirm.ask("\nProceed with this plan?"):
+            return AgentResult(
+                False,
+                "Cancelled.",
+            )
         try:
             original = self.editor.read_file(path)
         except Exception as exc:
