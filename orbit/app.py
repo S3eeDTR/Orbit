@@ -10,7 +10,7 @@ from .models import choose_default_model
 from .project import load_index, project_root, save_index
 from .prompt_shell import PromptShell
 from .sessions import add_recent, load_recent
-from .ui import console, render_markdown
+from .ui import console
 
 
 class OrbitApp:
@@ -58,7 +58,6 @@ class OrbitApp:
         )
 
         render_prompt_hint()
-
         add_recent(f"Opened {self.root.name or self.root}")
 
         while True:
@@ -84,7 +83,6 @@ class OrbitApp:
                 if not should_continue:
                     break
 
-                # Refresh autocomplete after commands like /index
                 self.shell = PromptShell(self.project.files)
                 continue
 
@@ -93,12 +91,11 @@ class OrbitApp:
                 self.project,
             )
 
-            reply = self.chat.send(expanded_input)
+            reply = self.chat.send(expanded_input, stream=True)
 
             if reply:
-                render_markdown(reply)
                 console.print(
-                    f"[dim]Tokens: {self.chat.total_tokens} | "
+                    f"\n[dim]Tokens: {self.chat.total_tokens} | "
                     f"Cost: ${self.chat.total_cost:.6f}[/dim]\n"
                 )
 
