@@ -83,5 +83,5 @@ class PromptShell:
         """Read one prompt from the user."""
 
         return self.session.prompt(
-            [("class:prompt", "orbit > ")]
+            [("class:prompt", "orbit ❯ ")]
         ).strip()
