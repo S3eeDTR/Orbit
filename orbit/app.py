@@ -34,7 +34,10 @@ class OrbitApp:
         self.model = str(self.config.get("default_model") or "")
 
         if not self.model:
-            self.model = choose_default_model(self.config, self.client) or ""
+            self.model = choose_default_model(
+                self.config,
+                self.client,
+            ) or ""
 
         if not self.model:
             console.print("[red]No model selected.[/red]")
@@ -58,6 +61,7 @@ class OrbitApp:
         )
 
         render_prompt_hint()
+
         add_recent(f"Opened {self.root.name or self.root}")
 
         while True:
@@ -83,6 +87,7 @@ class OrbitApp:
                 if not should_continue:
                     break
 
+                # Refresh autocomplete after commands like /index
                 self.shell = PromptShell(self.project.files)
                 continue
 
@@ -91,13 +96,8 @@ class OrbitApp:
                 self.project,
             )
 
-            reply = self.chat.send(expanded_input, stream=True)
-
-            if reply:
-                console.print(
-                    f"\n[dim]Tokens: {self.chat.total_tokens} | "
-                    f"Cost: ${self.chat.total_cost:.6f}[/dim]\n"
-                )
+            # Streaming chat
+            self.chat.send(expanded_input)
 
     def _verify_api_key(self) -> None:
         """Verify the OpenRouter API key before starting."""
@@ -118,7 +118,7 @@ class OrbitApp:
 
 
 def run_app() -> None:
-    """Application entry point used by __main__.py."""
+    """Application entry point."""
 
     app = OrbitApp()
     app.run()

@@ -203,3 +203,4 @@ class OpenRouterClient:
                 message = response.text[:500]
 
             raise OpenRouterError(f"{prefix}: {message}") from exc
+
