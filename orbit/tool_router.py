@@ -36,6 +36,9 @@ class ToolRouter:
         if self._handle_workspace_action(text):
             return ToolResult(handled=True)
 
+        if self._handle_ai_edit(text):
+            return ToolResult(handled=True)
+
         command = self._detect_terminal_command(text)
 
         if command:
@@ -177,6 +180,49 @@ class ToolRouter:
                     warn(f"Destination already exists: {dst}")
                 except Exception as exc:
                     warn(str(exc))
+
+            return True
+
+        return False
+
+    # ------------------------------------------------------------------
+    # Handle AI file edits
+    # ------------------------------------------------------------------
+
+    def _handle_ai_edit(self, text: str) -> bool:
+        """
+        Detect AI editing requests and forward them to the Agent.
+        """
+
+        value = text.strip()
+
+        patterns = [
+            r"^edit\s+([A-Za-z0-9_./\\-]+)\s+to\s+(.+)$",
+            r"^fix\s+([A-Za-z0-9_./\\-]+)\s+to\s+(.+)$",
+            r"^refactor\s+([A-Za-z0-9_./\\-]+)\s+to\s+(.+)$",
+            r"^optimize\s+([A-Za-z0-9_./\\-]+)\s+to\s+(.+)$",
+        ]
+
+        for pattern in patterns:
+            match = re.match(
+                pattern,
+                value,
+                flags=re.IGNORECASE,
+            )
+
+            if not match:
+                continue
+
+            path = match.group(1)
+            instruction = match.group(2)
+
+            result = self.agent.edit_file(
+                path,
+                instruction,
+            )
+
+            if not result.success:
+                warn(result.message)
 
             return True
 

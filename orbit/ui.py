@@ -1,3 +1,6 @@
+# ORBIT UI Module
+# Provides rendering functions for terminal-based UI using Rich library
+
 from __future__ import annotations
 
 from rich.console import Console
