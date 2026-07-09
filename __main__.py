@@ -1,8 +1,21 @@
-from .app import OrbitApp
+"""
+ORBIT entry point.
+
+Allows the application to be launched using:
+
+    python -m orbit
+
+or, when installed:
+
+    orbit
+"""
+
+from .app import run_app
 
 
 def main() -> None:
-    OrbitApp().run()
+    """CLI entry point."""
+    run_app()
 
 
 if __name__ == "__main__":
