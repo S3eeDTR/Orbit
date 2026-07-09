@@ -32,6 +32,13 @@ The long-term vision is to build a complete AI development environment capable o
 
 ---
 
+## Screenshot
+
+<p align="center">
+  <img src="assets/ORBITV1.png" alt="ORBIT Startup" width="900">
+</p>
+
+
 # Features
 
 ## Current
