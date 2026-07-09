@@ -31,6 +31,9 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 HISTORY_FILE = CONFIG_DIR / "history.json"
 MODELS_FILE = CONFIG_DIR / "models.json"
 
+RECENT_FILE = CONFIG_DIR / "recent.json"
+SESSION_DIR = CONFIG_DIR / "sessions"
+
 PROJECT_INSTRUCTIONS_FILE = "ORBIT.md"
 PROJECT_INDEX_FILE = ".orbit_index.json"
 # ============================================================================
