@@ -95,7 +95,7 @@ def render_prompt_hint() -> None:
     console.print(
         Align.left(
             Text(
-                "Enter to send. Esc+Enter for multiline. Ctrl+C to cancel.",
+                "Enter • Esc+Enter for multiline • Ctrl+C",
                 style="dim blue",
             )
         )
