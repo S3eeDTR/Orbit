@@ -225,7 +225,86 @@ class ToolRouter:
                 warn(result.message)
 
             return True
+        
+        natural_edit_match = re.match(
+            r"^(add|improve|replace|remove)\s+(.+)\s+to\s+([A-Za-z0-9_./\\-]+)$",
+            value,
+            flags=re.IGNORECASE,
+        )
 
+        if natural_edit_match:
+            action = natural_edit_match.group(1)
+            instruction = natural_edit_match.group(2)
+            path_hint = natural_edit_match.group(3)
+
+            matches = self.agent.planner.find_candidate_files(
+                path_hint,
+                limit=1,
+            )
+
+            if not matches:
+                warn(f"Couldn't find a file matching '{path_hint}'.")
+                return True
+
+            result = self.agent.edit_file(
+                matches[0],
+                f"{action} {instruction}",
+            )
+
+            if not result.success:
+                warn(result.message)
+
+            return True
+        # ---------------------------------------------------------
+        # Planner mode (no explicit file)
+        # ---------------------------------------------------------
+
+        generic_patterns = [
+            r"^add\s+(.+)$",
+            r"^improve\s+(.+)$",
+            r"^replace\s+(.+)$",
+            r"^remove\s+(.+)$",
+        ]
+
+        for pattern in generic_patterns:
+            match = re.match(
+                pattern,
+                value,
+                flags=re.IGNORECASE,
+            )
+
+            if not match:
+                continue
+
+            plan = self.agent.planner.plan_request(value)
+
+            if not plan.steps:
+                warn("No relevant files found.")
+                return True
+
+            console.print("\n[bold cyan]Execution Plan[/bold cyan]")
+            console.print(f"[bold]Objective:[/bold] {plan.objective}\n")
+
+            for step in plan.steps:
+                console.print(
+                    f"• {step.path} - {step.reason}"
+                )
+
+            if not Confirm.ask("\nProceed with this plan?"):
+                return True
+
+            # For v2, edit only the first candidate.
+            first = plan.steps[0]
+
+            result = self.agent.edit_file(
+                first.path,
+                value,
+            )
+
+            if not result.success:
+                warn(result.message)
+
+            return True
         return False
 
     # ------------------------------------------------------------------
