@@ -79,15 +79,6 @@ def render_startup(
         )
     )
 
-    console.print(
-        Panel(
-            "Type a message, reference files with [bold]@file.py[/bold], "
-            "or run [bold]/help[/bold].",
-            border_style="bright_black",
-            padding=(0, 1),
-        )
-    )
-
 
 def render_prompt_hint() -> None:
     """Render prompt usage hint."""
