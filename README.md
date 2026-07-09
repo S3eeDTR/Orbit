@@ -1,3 +1,7 @@
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](...)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](...)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-Compatible-orange.svg)](...)
+
 # ORBIT
 
 **A modern terminal-first AI coding assistant powered by OpenRouter.**
