@@ -1,8 +1,8 @@
 """
-Application constants and filesystem locations.
+Global application constants.
 
-All application paths are defined here so the project branding
-and directory structure can be changed from a single location.
+This module centralizes application metadata, filesystem paths,
+and OpenRouter API endpoints.
 """
 
 from pathlib import Path
@@ -12,10 +12,11 @@ from pathlib import Path
 # ============================================================================
 
 APP_NAME = "orbit"
+APP_DISPLAY_NAME = "ORBIT"
 APP_VERSION = "0.1.0"
 
 # ============================================================================
-# DIRECTORIES
+# FILESYSTEM
 # ============================================================================
 
 HOME_DIR = Path.home()
@@ -26,24 +27,29 @@ CACHE_DIR = CONFIG_DIR / "cache"
 LOG_DIR = CONFIG_DIR / "logs"
 SESSION_DIR = CONFIG_DIR / "sessions"
 
-# ============================================================================
-# FILES
-# ============================================================================
-
 CONFIG_FILE = CONFIG_DIR / "config.json"
 HISTORY_FILE = CONFIG_DIR / "history.json"
 MODELS_FILE = CONFIG_DIR / "models.json"
 
 # ============================================================================
-# OPENROUTER
+# OPENROUTER API
 # ============================================================================
 
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
-MODELS_ENDPOINT = f"{OPENROUTER_API_URL}/models"
-CHAT_ENDPOINT = f"{OPENROUTER_API_URL}/chat/completions"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+MODELS_ENDPOINT = f"{OPENROUTER_BASE_URL}/models"
+CHAT_ENDPOINT = f"{OPENROUTER_BASE_URL}/chat/completions"
 
 # ============================================================================
-# USER AGENT
+# HTTP
 # ============================================================================
 
 USER_AGENT = f"{APP_NAME}/{APP_VERSION}"
+
+HTTP_REFERER = "https://github.com/S3eeDTR/Orbit"
+
+APPLICATION_TITLE = "ORBIT"
+
+REQUEST_TIMEOUT = 120
+MODEL_FETCH_TIMEOUT = 30
+VERIFY_TIMEOUT = 10
