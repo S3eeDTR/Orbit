@@ -31,6 +31,7 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 HISTORY_FILE = CONFIG_DIR / "history.json"
 MODELS_FILE = CONFIG_DIR / "models.json"
 
+PROJECT_INSTRUCTIONS_FILE = "ORBIT.md"
 # ============================================================================
 # OPENROUTER API
 # ============================================================================
