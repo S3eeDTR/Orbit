@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .banner import render_prompt_hint, render_startup
 from .terminal import Terminal
+from .tool_router import ToolRouter
 from .chat import ChatSession
 from .client import OpenRouterClient
 from .commands import expand_file_refs, handle_command
@@ -33,6 +34,7 @@ class OrbitApp:
         self.workspace = Workspace(self.root)
         self.editor = Editor(self.workspace)
         self.terminal = Terminal(self.root)
+        self.tool_router = ToolRouter(self.terminal)
 
         self.project = load_index(self.root)
         save_index(self.project)
@@ -98,7 +100,11 @@ class OrbitApp:
 
                 self.shell = PromptShell(self.project.files)
                 continue
-
+            
+            tool_result = self.tool_router.handle(user_input)
+            if tool_result.handled:
+                continue
+            
             expanded_input = expand_file_refs(
                 user_input,
                 self.project,
