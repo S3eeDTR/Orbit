@@ -42,8 +42,6 @@ class OrbitApp:
         self.project = load_index(self.root)
         save_index(self.project)
 
-        self.planner = Planner(self.project)
-
         self._verify_api_key()
 
         self.model = str(self.config.get("default_model") or "")
@@ -62,6 +60,11 @@ class OrbitApp:
             self.client,
             self.model,
             self.root,
+        )
+
+        self.planner = Planner(
+            self.project,
+            self.chat,  
         )
 
         self.agent = Agent(

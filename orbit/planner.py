@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .chat import ChatSession
 from .project import ProjectInfo
 
 
@@ -19,14 +20,18 @@ class Plan:
 
 class Planner:
     """
-    Planner for ORBIT.
+    Hybrid planner for ORBIT.
 
-    Performs simple heuristic searches over the indexed project
-    to find relevant files.
+    Uses AI first, then falls back to filename heuristics.
     """
 
-    def __init__(self, project: ProjectInfo) -> None:
+    def __init__(
+        self,
+        project: ProjectInfo,
+        chat: ChatSession,
+    ) -> None:
         self.project = project
+        self.chat = chat
 
     def plan_edit(
         self,
@@ -44,6 +49,75 @@ class Planner:
         )
 
     def plan_request(
+        self,
+        request: str,
+    ) -> Plan:
+        ai_plan = self.plan_with_ai(request)
+
+        if ai_plan.steps:
+            return ai_plan
+
+        return self.plan_with_heuristics(request)
+
+    def plan_with_ai(
+        self,
+        request: str,
+        limit: int = 80,
+    ) -> Plan:
+        files = "\n".join(self.project.files[:limit])
+
+        prompt = f"""
+            You are ORBIT's planning engine.
+
+            Your ONLY job is to decide which files must be modified to complete the user's request.
+
+            User request:
+            {request}
+
+            Project files:
+            {files}
+
+            Instructions:
+
+            - Select the SMALLEST possible set of files.
+            - Include ONLY files that require code changes.
+            - Do NOT include files that are merely related.
+            - Prefer precision over completeness.
+            - If a change can be made in one file, return one file.
+            - Only return multiple files when they are all required.
+            - Never invent file paths.
+            - Use only the files listed above.
+
+            Output format:
+            One file path per line.
+
+            Do not explain.
+            Do not use markdown.
+            Do not use bullets.
+            Return nothing if no suitable file exists.
+            """
+
+        reply = self.chat.complete_once(prompt)
+
+        if not reply:
+            return Plan(objective=request, steps=[])
+
+        selected = self._parse_file_paths(reply)
+
+        steps = [
+            PlanStep(
+                path=path,
+                reason="Selected by AI planner.",
+            )
+            for path in selected
+        ]
+
+        return Plan(
+            objective=request,
+            steps=steps,
+        )
+
+    def plan_with_heuristics(
         self,
         request: str,
     ) -> Plan:
@@ -87,6 +161,18 @@ class Planner:
             path
             for _, path in matches[:limit]
         ]
+
+    def _parse_file_paths(self, text: str) -> list[str]:
+        valid_files = set(self.project.files)
+        selected: list[str] = []
+
+        for line in text.splitlines():
+            path = line.strip().strip("-*` ")
+
+            if path in valid_files and path not in selected:
+                selected.append(path)
+
+        return selected
 
     def _score_path(
         self,
