@@ -1,33 +1,142 @@
+from __future__ import annotations
+
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
+from rich.text import Text
 
 console = Console()
 
 
+# ============================================================================
+# MARKDOWN
+# ============================================================================
+
 def render_markdown(text: str) -> None:
+    """Render markdown with a plain-text fallback."""
+
     try:
         console.print(Markdown(text))
     except Exception:
         console.print(text)
 
 
-def render_code(code: str, language: str = "python") -> None:
-    console.print(Syntax(code, language, theme="monokai", line_numbers=True))
+# ============================================================================
+# CODE
+# ============================================================================
+
+def render_code(
+    code: str,
+    language: str = "python",
+) -> None:
+    """Render syntax highlighted code."""
+
+    console.print(
+        Syntax(
+            code,
+            language,
+            theme="monokai",
+            line_numbers=True,
+            word_wrap=True,
+        )
+    )
 
 
-def error(message: str) -> None:
-    console.print(f"[red]❌ {message}[/red]")
+# ============================================================================
+# STATUS MESSAGES
+# ============================================================================
+
+def ok(message: str) -> None:
+    console.print(f"[green]{message}[/green]")
 
 
 def warn(message: str) -> None:
-    console.print(f"[yellow]⚠️ {message}[/yellow]")
+    console.print(f"[yellow]{message}[/yellow]")
 
 
-def ok(message: str) -> None:
-    console.print(f"[green]✅ {message}[/green]")
+def error(message: str) -> None:
+    console.print(f"[red]{message}[/red]")
 
 
-def info_panel(text: str, title: str = "Info") -> None:
-    console.print(Panel(text, title=title, border_style="cyan"))
+def info(message: str) -> None:
+    console.print(f"[cyan]{message}[/cyan]")
+
+
+# ============================================================================
+# PANELS
+# ============================================================================
+
+def panel(
+    message: str,
+    title: str | None = None,
+    border_style: str = "cyan",
+) -> None:
+    """Display a Rich panel."""
+
+    console.print(
+        Panel(
+            message,
+            title=title,
+            border_style=border_style,
+        )
+    )
+
+
+def info_panel(
+    message: str,
+    title: str = "Information",
+) -> None:
+    panel(
+        message,
+        title=title,
+        border_style="cyan",
+    )
+
+
+def success_panel(
+    message: str,
+    title: str = "Success",
+) -> None:
+    panel(
+        message,
+        title=title,
+        border_style="green",
+    )
+
+
+def warning_panel(
+    message: str,
+    title: str = "Warning",
+) -> None:
+    panel(
+        message,
+        title=title,
+        border_style="yellow",
+    )
+
+
+def error_panel(
+    message: str,
+    title: str = "Error",
+) -> None:
+    panel(
+        message,
+        title=title,
+        border_style="red",
+    )
+
+
+# ============================================================================
+# HEADINGS
+# ============================================================================
+
+def heading(text: str) -> None:
+    """Print a section heading."""
+
+    console.rule(
+        Text(
+            text,
+            style="bold orange1",
+        )
+    )
