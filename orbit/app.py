@@ -34,7 +34,10 @@ class OrbitApp:
         self.workspace = Workspace(self.root)
         self.editor = Editor(self.workspace)
         self.terminal = Terminal(self.root)
-        self.tool_router = ToolRouter(self.terminal)
+        self.tool_router = ToolRouter(
+            self.terminal,
+            self.editor,
+        )
 
         self.project = load_index(self.root)
         save_index(self.project)
@@ -104,7 +107,7 @@ class OrbitApp:
             tool_result = self.tool_router.handle(user_input)
             if tool_result.handled:
                 continue
-            
+
             expanded_input = expand_file_refs(
                 user_input,
                 self.project,
