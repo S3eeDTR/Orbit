@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import time
+from collections.abc import Iterator
 from typing import Any
 
 import requests
@@ -54,30 +56,117 @@ class OpenRouterClient:
         )
 
         if response.status_code == 429:
+            response = self._retry_after_rate_limit(response, payload, stream=False)
+
+        self._raise_for_status(response, "OpenRouter chat request failed")
+        return response.json()
+
+    def chat_stream(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+    ) -> Iterator[str]:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": True,
+        }
+
+        response = self.session.post(
+            CHAT_ENDPOINT,
+            json=payload,
+            timeout=self.timeout,
+            stream=True,
+        )
+
+        if response.status_code == 429:
+            response.close()
             retry_after, provider = self._rate_limit_details(response)
             console.print(
                 f"[yellow]Rate limited by {provider}. "
                 f"Retrying in {retry_after:.0f} seconds...[/yellow]"
             )
-
             time.sleep(max(1, retry_after))
 
             response = self.session.post(
                 CHAT_ENDPOINT,
                 json=payload,
                 timeout=self.timeout,
+                stream=True,
             )
 
             if response.status_code == 429:
                 retry_after, provider = self._rate_limit_details(response)
+                response.close()
                 raise OpenRouterError(
                     f"Rate limited by {provider}. Try again in about "
                     f"{retry_after:.0f} seconds, or switch models with /model. "
                     "Free models are often busy."
                 )
 
-        self._raise_for_status(response, "OpenRouter chat request failed")
-        return response.json()
+        self._raise_for_status(response, "OpenRouter streaming request failed")
+
+        try:
+            for raw_line in response.iter_lines(decode_unicode=True):
+                if not raw_line:
+                    continue
+
+                line = raw_line.strip()
+
+                if not line.startswith("data: "):
+                    continue
+
+                data = line.removeprefix("data: ").strip()
+
+                if data == "[DONE]":
+                    break
+
+                try:
+                    event = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+
+                choice = (event.get("choices") or [{}])[0]
+                delta = choice.get("delta") or {}
+                content = delta.get("content")
+
+                if content:
+                    yield str(content)
+
+        finally:
+            response.close()
+
+    def _retry_after_rate_limit(
+        self,
+        response: requests.Response,
+        payload: dict[str, Any],
+        stream: bool,
+    ) -> requests.Response:
+        retry_after, provider = self._rate_limit_details(response)
+
+        console.print(
+            f"[yellow]Rate limited by {provider}. "
+            f"Retrying in {retry_after:.0f} seconds...[/yellow]"
+        )
+
+        time.sleep(max(1, retry_after))
+
+        retry_response = self.session.post(
+            CHAT_ENDPOINT,
+            json=payload,
+            timeout=self.timeout,
+            stream=stream,
+        )
+
+        if retry_response.status_code == 429:
+            retry_after, provider = self._rate_limit_details(retry_response)
+            raise OpenRouterError(
+                f"Rate limited by {provider}. Try again in about "
+                f"{retry_after:.0f} seconds, or switch models with /model. "
+                "Free models are often busy."
+            )
+
+        return retry_response
 
     @staticmethod
     def _rate_limit_details(response: requests.Response) -> tuple[float, str]:
