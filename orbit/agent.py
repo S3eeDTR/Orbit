@@ -1,15 +1,16 @@
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
-
-from rich.prompt import Confirm
 from rich.panel import Panel
+from rich.prompt import Confirm
 
 from .chat import ChatSession
 from .editor import Editor
 from .planner import Planner
+from .terminal import Terminal
 from .ui import console, ok, warn
 
 
@@ -23,7 +24,8 @@ class Agent:
     """
     High-level AI workflows.
 
-    Coordinates ChatSession + Editor.
+    Coordinates planning, AI-generated edits, file updates,
+    and post-edit validation.
     """
 
     def __init__(
@@ -31,11 +33,12 @@ class Agent:
         chat: ChatSession,
         editor: Editor,
         planner: Planner,
+        terminal: Terminal,
     ) -> None:
         self.chat = chat
         self.editor = editor
         self.planner = planner
-
+        self.terminal = terminal
 
     def edit_request(
         self,
@@ -89,8 +92,7 @@ class Agent:
             except Exception as exc:
                 return AgentResult(
                     False,
-                    f"Could not generate edit for "
-                    f"{step.path}: {exc}",
+                    f"Could not generate edit for {step.path}: {exc}",
                 )
 
             if not updated:
@@ -107,14 +109,10 @@ class Agent:
             except Exception as exc:
                 return AgentResult(
                     False,
-                    f"Could not prepare diff for "
-                    f"{step.path}: {exc}",
+                    f"Could not prepare diff for {step.path}: {exc}",
                 )
 
-            if (
-                proposal.original_content
-                != proposal.new_content
-            ):
+            if proposal.original_content != proposal.new_content:
                 proposals.append(proposal)
 
         if not proposals:
@@ -153,11 +151,70 @@ class Agent:
         for proposal in proposals:
             ok(f"Updated {proposal.path}")
 
+        validation = self.validate_changes()
+
+        if not validation.success:
+            warn(validation.message)
+
+            return AgentResult(
+                False,
+                (
+                    f"Applied changes to {len(proposals)} file(s), "
+                    "but validation failed."
+                ),
+            )
+
         return AgentResult(
             True,
-            f"Applied changes to {len(proposals)} file(s).",
+            (
+                f"Applied and validated changes to "
+                f"{len(proposals)} file(s)."
+            ),
         )
 
+    def validate_changes(
+        self,
+        command: str = "python -m compileall orbit",
+    ) -> AgentResult:
+        """
+        Run a safe validation command after applying edits.
+        """
+
+        try:
+            result = self.terminal.run_safe(command)
+        except Exception as exc:
+            return AgentResult(
+                False,
+                f"Validation could not run: {exc}",
+            )
+
+        output = result.stdout or result.stderr or "No output."
+
+        console.print(
+            Panel(
+                output,
+                title=f"Validation: {command}",
+                border_style=(
+                    "green"
+                    if result.exit_code == 0
+                    else "red"
+                ),
+            )
+        )
+
+        if result.exit_code != 0:
+            return AgentResult(
+                False,
+                (
+                    f"Validation failed with exit code "
+                    f"{result.exit_code}."
+                ),
+            )
+
+        return AgentResult(
+            True,
+            "Validation passed.",
+        )
 
     def edit_file(
         self,
@@ -166,16 +223,18 @@ class Agent:
     ) -> AgentResult:
         """
         Generate an AI edit, preview the diff,
-        and optionally apply it.
+        apply it, and validate the result.
         """
+
         plan = self.planner.plan_edit(
             str(path),
             instruction,
         )
 
         console.print("\n[bold cyan]Execution Plan[/bold cyan]")
-
-        console.print(f"[bold]Objective:[/bold] {plan.objective}\n")
+        console.print(
+            f"[bold]Objective:[/bold] {plan.objective}\n"
+        )
 
         for step in plan.steps:
             console.print(
@@ -187,24 +246,43 @@ class Agent:
                 False,
                 "Cancelled.",
             )
+
         try:
             original = self.editor.read_file(path)
         except Exception as exc:
-            return AgentResult(False, str(exc))
+            return AgentResult(
+                False,
+                f"Could not read {path}: {exc}",
+            )
 
-        updated = self.chat.generate_file_edit(
-            str(path),
-            original,
-            instruction,
-        )
+        try:
+            updated = self.chat.generate_file_edit(
+                str(path),
+                original,
+                instruction,
+            )
+        except Exception as exc:
+            return AgentResult(
+                False,
+                f"Could not generate edit for {path}: {exc}",
+            )
 
         if not updated:
-            return AgentResult(False, "Model returned no edit.")
+            return AgentResult(
+                False,
+                "Model returned no edit.",
+            )
 
-        proposal = self.editor.propose_file_edit(
-            path,
-            updated,
-        )
+        try:
+            proposal = self.editor.propose_file_edit(
+                path,
+                updated,
+            )
+        except Exception as exc:
+            return AgentResult(
+                False,
+                f"Could not prepare diff for {path}: {exc}",
+            )
 
         console.print(
             Panel(
@@ -226,14 +304,36 @@ class Agent:
                 "Cancelled.",
             )
 
-        self.editor.apply_changes(
-            path,
-            proposal.new_content,
-        )
+        try:
+            self.editor.apply_changes(
+                path,
+                proposal.new_content,
+            )
+        except Exception as exc:
+            return AgentResult(
+                False,
+                (
+                    f"Could not apply changes to "
+                    f"{proposal.path}: {exc}"
+                ),
+            )
 
         ok(f"Updated {proposal.path}")
 
+        validation = self.validate_changes()
+
+        if not validation.success:
+            warn(validation.message)
+
+            return AgentResult(
+                False,
+                (
+                    f"Updated {proposal.path}, "
+                    "but validation failed."
+                ),
+            )
+
         return AgentResult(
             True,
-            "Applied.",
+            "Applied and validated.",
         )

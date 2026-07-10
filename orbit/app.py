@@ -79,6 +79,7 @@ class OrbitApp:
             self.chat,
             self.editor,
             self.planner,
+            self.terminal,
         )
         
         self.tool_router = ToolRouter(
