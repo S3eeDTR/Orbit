@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from .workspace import Workspace
-from dataclasses import dataclass
 
 
 @dataclass
@@ -18,15 +18,13 @@ class Editor:
     """
     High-level editing operations.
 
-    This class sits above Workspace and will later coordinate
-    AI-generated edits, diffs, confirmations, and file writes.
+    This class sits above Workspace and coordinates
+    proposals, diffs, file writes, and rollback.
     """
 
     def __init__(self, workspace: Workspace) -> None:
         self.workspace = workspace
 
-
-    
     # ------------------------------------------------------------------
     # Apply Multiple
     # ------------------------------------------------------------------
@@ -79,10 +77,45 @@ class Editor:
                 f"Multi-file edit failed and was rolled back: {exc}"
             ) from exc
 
+    # ------------------------------------------------------------------
+    # Restore Proposals
+    # ------------------------------------------------------------------
+
+    def restore_proposals(
+        self,
+        proposals: list[EditProposal],
+    ) -> None:
+        """
+        Restore files to the original contents stored in edit proposals.
+
+        If restoring any file fails, continue restoring the remaining
+        files and report all failures together.
+        """
+
+        rollback_errors: list[str] = []
+
+        for proposal in reversed(proposals):
+            try:
+                self.workspace.write_file(
+                    proposal.path,
+                    proposal.original_content,
+                )
+            except Exception as exc:
+                rollback_errors.append(
+                    f"{proposal.path}: {exc}"
+                )
+
+        if rollback_errors:
+            details = "; ".join(rollback_errors)
+
+            raise RuntimeError(
+                f"Rollback failed for: {details}"
+            )
 
     # ------------------------------------------------------------------
     # Propose File Edit
     # ------------------------------------------------------------------
+
     def propose_file_edit(
         self,
         path: str | Path,

@@ -7,7 +7,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 
 from .chat import ChatSession
-from .editor import Editor
+from .editor import EditProposal, Editor
 from .planner import Planner
 from .terminal import Terminal
 from .ui import console, ok, warn
@@ -150,6 +150,7 @@ class Agent:
         validation_result = self.validate_and_repair(
             instruction=instruction,
             paths=changed_paths,
+            original_proposals=proposals,
         )
 
         if not validation_result.success:
@@ -253,6 +254,7 @@ class Agent:
         validation_result = self.validate_and_repair(
             instruction=instruction,
             paths=[proposal.path],
+            original_proposals=[proposal],
         )
 
         if not validation_result.success:
@@ -344,6 +346,7 @@ class Agent:
         self,
         instruction: str,
         paths: list[str],
+        original_proposals: list[EditProposal],
         max_attempts: int = DEFAULT_MAX_REPAIR_ATTEMPTS,
     ) -> AgentResult:
         """
@@ -375,8 +378,8 @@ class Agent:
                 continue
 
             if validation.exit_code is None:
-                return AgentResult(
-                    False,
+                return self._rollback_after_failure(
+                    original_proposals,
                     validation.message,
                 )
 
@@ -388,11 +391,77 @@ class Agent:
             )
 
             if not repair_result.success:
-                return repair_result
+                return self._rollback_after_failure(
+                    original_proposals,
+                    repair_result.message,
+                )
 
         return AgentResult(
             True,
             "All available validation commands passed.",
+        )
+
+    def _rollback_after_failure(
+        self,
+        original_proposals: list[EditProposal],
+        failure_message: str,
+    ) -> AgentResult:
+        """
+        Restore the original file contents after validation or repair fails.
+        """
+
+        warn(failure_message)
+        warn("Validation failed. Rolling back original changes.")
+
+        try:
+            self.editor.restore_proposals(original_proposals)
+        except Exception as exc:
+            return AgentResult(
+                False,
+                (
+                    f"{failure_message} "
+                    f"Automatic rollback also failed: {exc}"
+                ),
+            )
+
+        for proposal in original_proposals:
+            ok(f"Restored {proposal.path}")
+
+        rollback_paths = [
+            proposal.path
+            for proposal in original_proposals
+        ]
+
+        commands = self.validator.build_commands(rollback_paths)
+        rollback_validation_failures: list[str] = []
+
+        for validation_command in commands:
+            result = self.validate_command(validation_command)
+
+            if not result.success:
+                rollback_validation_failures.append(
+                    f"{validation_command.description}: "
+                    f"{result.message}"
+                )
+
+        if rollback_validation_failures:
+            details = "; ".join(rollback_validation_failures)
+
+            return AgentResult(
+                False,
+                (
+                    f"{failure_message} Original files were restored, "
+                    f"but the restored state did not validate: {details}"
+                ),
+            )
+
+        ok("Rollback completed successfully.")
+
+        return AgentResult(
+            False,
+            (
+                f"{failure_message} Original file contents were restored."
+            ),
         )
 
     def _repair_failed_validation(
