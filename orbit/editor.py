@@ -25,6 +25,61 @@ class Editor:
     def __init__(self, workspace: Workspace) -> None:
         self.workspace = workspace
 
+
+    
+    # ------------------------------------------------------------------
+    # Apply Multiple
+    # ------------------------------------------------------------------
+
+    def apply_proposals(
+        self,
+        proposals: list[EditProposal],
+    ) -> None:
+        """
+        Apply multiple edit proposals transactionally.
+
+        If any write fails, all previously modified files are restored
+        to their original contents.
+        """
+
+        applied: list[EditProposal] = []
+
+        try:
+            for proposal in proposals:
+                self.workspace.write_file(
+                    proposal.path,
+                    proposal.new_content,
+                )
+
+                applied.append(proposal)
+
+        except Exception as exc:
+            rollback_errors: list[str] = []
+
+            for proposal in reversed(applied):
+                try:
+                    self.workspace.write_file(
+                        proposal.path,
+                        proposal.original_content,
+                    )
+                except Exception as rollback_exc:
+                    rollback_errors.append(
+                        f"{proposal.path}: {rollback_exc}"
+                    )
+
+            if rollback_errors:
+                details = "; ".join(rollback_errors)
+
+                raise RuntimeError(
+                    f"Multi-file edit failed: {exc}. "
+                    f"Rollback also failed for: {details}"
+                ) from exc
+
+            raise RuntimeError(
+                f"Multi-file edit failed and was rolled back: {exc}"
+            ) from exc
+
+
     # ------------------------------------------------------------------
     # Propose File Edit
     # ------------------------------------------------------------------

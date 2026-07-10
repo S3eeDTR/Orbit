@@ -264,6 +264,9 @@ class ToolRouter:
             r"^improve\s+(.+)$",
             r"^replace\s+(.+)$",
             r"^remove\s+(.+)$",
+            r"^refactor\s+(.+)$",
+            r"^optimize\s+(.+)$",
+            r"^fix\s+(.+)$",
         ]
 
         for pattern in generic_patterns:
@@ -276,36 +279,12 @@ class ToolRouter:
             if not match:
                 continue
 
-            plan = self.agent.planner.plan_request(value)
-
-            if not plan.steps:
-                warn("No relevant files found.")
-                return True
-
-            console.print("\n[bold cyan]Execution Plan[/bold cyan]")
-            console.print(f"[bold]Objective:[/bold] {plan.objective}\n")
-
-            for step in plan.steps:
-                console.print(
-                    f"• {step.path} - {step.reason}"
-                )
-
-            if not Confirm.ask("\nProceed with this plan?"):
-                return True
-
-            # For v2, edit only the first candidate.
-            first = plan.steps[0]
-
-            result = self.agent.edit_file(
-                first.path,
-                value,
-            )
+            result = self.agent.edit_request(value)
 
             if not result.success:
                 warn(result.message)
 
             return True
-        return False
 
     # ------------------------------------------------------------------
     # Terminal actions
