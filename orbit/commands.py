@@ -7,8 +7,10 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .chat import ChatSession
+from .checkpoints import CheckpointManager
 from .client import OpenRouterClient
 from .config import Config, save_config
+from .editor import Editor
 from .models import model_id_from_argument, print_models
 from .project import (
     ProjectInfo,
@@ -40,6 +42,9 @@ HELP_TEXT = """
   /init               Create ORBIT.md project instructions
   /save               Save current chat session
   /stats              Show session statistics
+  /history            Show recent edit checkpoints
+  /show checkpoint ID Show checkpoint details
+  /undo [ID]          Undo the latest or selected checkpoint
   /exit               Exit
 
 [bold cyan]Project usage[/bold cyan]
@@ -87,6 +92,7 @@ def handle_command(
     client: OpenRouterClient,
     project: ProjectInfo,
     terminal: Terminal,
+    checkpoints: CheckpointManager,
 ) -> bool:
     """Handle slash commands. Return False when the app should exit."""
 
@@ -213,6 +219,74 @@ def handle_command(
                     border_style="red",
                 )
             )
+
+
+    elif command == "/history":
+        items = checkpoints.list()
+
+        if not items:
+            warn("No checkpoints found.")
+            return True
+
+        table = Table(title="Edit checkpoints", border_style="cyan")
+        table.add_column("ID", style="cyan")
+        table.add_column("Created", style="dim")
+        table.add_column("Files", justify="right")
+        table.add_column("Status")
+        table.add_column("Instruction")
+
+        for item in items:
+            table.add_row(
+                item.id,
+                item.created_at.replace("T", " ")[:19],
+                str(len(item.files)),
+                "undone" if item.undone else "active",
+                item.instruction or "-",
+            )
+
+        console.print(table)
+
+    elif command == "/show":
+        show_parts = argument.split(maxsplit=1)
+
+        if len(show_parts) != 2 or show_parts[0].lower() != "checkpoint":
+            warn("Usage: /show checkpoint <id>")
+            return True
+
+        try:
+            checkpoint = checkpoints.get(show_parts[1])
+        except ValueError as exc:
+            warn(str(exc))
+            return True
+
+        table = Table(
+            title=f"Checkpoint {checkpoint.id}",
+            border_style="cyan",
+        )
+        table.add_column("Property", style="cyan")
+        table.add_column("Value")
+        table.add_row("Created", checkpoint.created_at)
+        table.add_row("Status", "undone" if checkpoint.undone else "active")
+        table.add_row("Instruction", checkpoint.instruction or "-")
+        table.add_row("Files", "\n".join(item.path for item in checkpoint.files))
+        console.print(table)
+
+    elif command == "/undo":
+        checkpoint_id = argument or None
+
+        try:
+            checkpoint = checkpoints.undo(
+                Editor(Workspace(project.root)),
+                checkpoint_id,
+            )
+        except Exception as exc:
+            warn(f"Undo failed: {exc}")
+            return True
+
+        ok(
+            f"Undid checkpoint {checkpoint.id} and restored "
+            f"{len(checkpoint.files)} file(s)."
+        )
 
     elif command == "/init":
         path = create_instructions(project.root)

@@ -7,6 +7,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 
 from .chat import ChatSession
+from .checkpoints import CheckpointManager
 from .editor import EditProposal, Editor
 from .planner import Planner
 from .terminal import Terminal
@@ -47,12 +48,14 @@ class Agent:
         planner: Planner,
         terminal: Terminal,
         validator: Validator,
+        checkpoints: CheckpointManager,
     ) -> None:
         self.chat = chat
         self.editor = editor
         self.planner = planner
         self.terminal = terminal
         self.validator = validator
+        self.checkpoints = checkpoints
 
     def edit_request(
         self,
@@ -156,13 +159,25 @@ class Agent:
         if not validation_result.success:
             return validation_result
 
-        return AgentResult(
-            True,
-            (
-                f"Applied and validated changes to "
-                f"{len(proposals)} file(s)."
-            ),
+        try:
+            checkpoint = self.checkpoints.save(
+                instruction,
+                proposals,
+                self.editor,
+            )
+        except Exception as exc:
+            warn(f"Changes succeeded, but checkpoint creation failed: {exc}")
+            checkpoint = None
+
+        message = (
+            f"Applied and validated changes to "
+            f"{len(proposals)} file(s)."
         )
+
+        if checkpoint is not None:
+            message += f" Checkpoint: {checkpoint.id}."
+
+        return AgentResult(True, message)
 
     def edit_file(
         self,
@@ -260,7 +275,22 @@ class Agent:
         if not validation_result.success:
             return validation_result
 
-        return AgentResult(True, "Applied and validated.")
+        try:
+            checkpoint = self.checkpoints.save(
+                instruction,
+                [proposal],
+                self.editor,
+            )
+        except Exception as exc:
+            warn(f"Changes succeeded, but checkpoint creation failed: {exc}")
+            checkpoint = None
+
+        message = "Applied and validated."
+
+        if checkpoint is not None:
+            message += f" Checkpoint: {checkpoint.id}."
+
+        return AgentResult(True, message)
 
     def validate_command(
         self,

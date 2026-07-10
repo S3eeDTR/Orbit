@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .banner import render_prompt_hint, render_startup
+from .checkpoints import CheckpointManager
 from .terminal import Terminal
 from .validator import Validator
 from .tool_router import ToolRouter
@@ -39,6 +40,7 @@ class OrbitApp:
         self.editor = Editor(self.workspace)
         self.terminal = Terminal(self.root)
         self.validator = Validator(self.root)
+        self.checkpoints = CheckpointManager(self.root)
         
        
 
@@ -83,6 +85,7 @@ class OrbitApp:
             self.planner,
             self.terminal,
             self.validator,
+            self.checkpoints,
         )
         
         self.tool_router = ToolRouter(
@@ -126,6 +129,7 @@ class OrbitApp:
                     self.client,
                     self.project,
                     self.terminal,
+                    self.checkpoints,
                 )
 
                 if not should_continue:
