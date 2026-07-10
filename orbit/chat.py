@@ -200,6 +200,65 @@ class ChatSession:
 
         return text
 
+    def generate_repair_edit(
+        self,
+        path: str,
+        current_content: str,
+        original_instruction: str,
+        validation_command: str,
+        validation_output: str,
+        attempt: int,
+        max_attempts: int,
+    ) -> str | None:
+        """
+        Generate a corrected full-file replacement after validation fails.
+        """
+
+        prompt = f"""
+You are repairing a source code file after validation failed.
+
+File path:
+{path}
+
+Original user instruction:
+{original_instruction}
+
+Repair attempt:
+{attempt} of {max_attempts}
+
+Validation command:
+{validation_command}
+
+Validation output:
+{validation_output}
+
+Current file content:
+
+```text
+{current_content}
+```
+
+Fix only the problems indicated by the validation output while preserving
+the user's requested change.
+
+Rules:
+
+- Return the complete corrected file.
+- Do not explain anything.
+- Do not use markdown.
+- Do not wrap the response in code fences.
+- Do not remove unrelated functionality.
+- Do not invent dependencies or APIs.
+- Keep the repair as small and focused as possible.
+"""
+
+        reply = self.complete_once(prompt)
+
+        if not reply:
+            return None
+
+        return self._strip_code_fence(reply)
+
     def show_stats(self) -> None:
         self.stats.render(self.model)
 

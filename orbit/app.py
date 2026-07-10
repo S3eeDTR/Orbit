@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .banner import render_prompt_hint, render_startup
 from .terminal import Terminal
+from .validator import Validator
 from .tool_router import ToolRouter
 from .chat import ChatSession
 from .agent import Agent
@@ -37,6 +38,7 @@ class OrbitApp:
         self.workspace = Workspace(self.root)
         self.editor = Editor(self.workspace)
         self.terminal = Terminal(self.root)
+        self.validator = Validator(self.root)
         
        
 
@@ -80,6 +82,7 @@ class OrbitApp:
             self.editor,
             self.planner,
             self.terminal,
+            self.validator,
         )
         
         self.tool_router = ToolRouter(

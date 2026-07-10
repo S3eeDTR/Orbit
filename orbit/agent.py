@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,6 +11,10 @@ from .editor import Editor
 from .planner import Planner
 from .terminal import Terminal
 from .ui import console, ok, warn
+from .validator import ValidationCommand, Validator
+
+
+DEFAULT_MAX_REPAIR_ATTEMPTS = 2
 
 
 @dataclass
@@ -20,12 +23,21 @@ class AgentResult:
     message: str = ""
 
 
+@dataclass
+class ValidationResult:
+    success: bool
+    command: str
+    output: str
+    exit_code: int | None
+    message: str = ""
+
+
 class Agent:
     """
     High-level AI workflows.
 
     Coordinates planning, AI-generated edits, file updates,
-    and post-edit validation.
+    cross-language validation, and controlled repair attempts.
     """
 
     def __init__(
@@ -34,11 +46,13 @@ class Agent:
         editor: Editor,
         planner: Planner,
         terminal: Terminal,
+        validator: Validator,
     ) -> None:
         self.chat = chat
         self.editor = editor
         self.planner = planner
         self.terminal = terminal
+        self.validator = validator
 
     def edit_request(
         self,
@@ -51,26 +65,16 @@ class Agent:
         plan = self.planner.plan_request(instruction)
 
         if not plan.steps:
-            return AgentResult(
-                False,
-                "No suitable files found.",
-            )
+            return AgentResult(False, "No suitable files found.")
 
         console.print("\n[bold cyan]Execution Plan[/bold cyan]")
-        console.print(
-            f"[bold]Objective:[/bold] {plan.objective}\n"
-        )
+        console.print(f"[bold]Objective:[/bold] {plan.objective}\n")
 
         for step in plan.steps:
-            console.print(
-                f"• {step.path} - {step.reason}"
-            )
+            console.print(f"• {step.path} - {step.reason}")
 
         if not Confirm.ask("\nProceed with this plan?"):
-            return AgentResult(
-                False,
-                "Cancelled.",
-            )
+            return AgentResult(False, "Cancelled.")
 
         proposals = []
 
@@ -116,10 +120,7 @@ class Agent:
                 proposals.append(proposal)
 
         if not proposals:
-            return AgentResult(
-                True,
-                "No changes required.",
-            )
+            return AgentResult(True, "No changes required.")
 
         for proposal in proposals:
             console.print(
@@ -133,36 +134,26 @@ class Agent:
         if not Confirm.ask(
             f"Apply changes to {len(proposals)} file(s)?"
         ):
-            return AgentResult(
-                False,
-                "Cancelled.",
-            )
+            return AgentResult(False, "Cancelled.")
 
         try:
             self.editor.apply_proposals(proposals)
         except Exception as exc:
             warn(str(exc))
-
-            return AgentResult(
-                False,
-                str(exc),
-            )
+            return AgentResult(False, str(exc))
 
         for proposal in proposals:
             ok(f"Updated {proposal.path}")
 
-        validation = self.validate_changes()
+        changed_paths = [proposal.path for proposal in proposals]
 
-        if not validation.success:
-            warn(validation.message)
+        validation_result = self.validate_and_repair(
+            instruction=instruction,
+            paths=changed_paths,
+        )
 
-            return AgentResult(
-                False,
-                (
-                    f"Applied changes to {len(proposals)} file(s), "
-                    "but validation failed."
-                ),
-            )
+        if not validation_result.success:
+            return validation_result
 
         return AgentResult(
             True,
@@ -172,50 +163,6 @@ class Agent:
             ),
         )
 
-    def validate_changes(
-        self,
-        command: str = "python -m compileall orbit",
-    ) -> AgentResult:
-        """
-        Run a safe validation command after applying edits.
-        """
-
-        try:
-            result = self.terminal.run_safe(command)
-        except Exception as exc:
-            return AgentResult(
-                False,
-                f"Validation could not run: {exc}",
-            )
-
-        output = result.stdout or result.stderr or "No output."
-
-        console.print(
-            Panel(
-                output,
-                title=f"Validation: {command}",
-                border_style=(
-                    "green"
-                    if result.exit_code == 0
-                    else "red"
-                ),
-            )
-        )
-
-        if result.exit_code != 0:
-            return AgentResult(
-                False,
-                (
-                    f"Validation failed with exit code "
-                    f"{result.exit_code}."
-                ),
-            )
-
-        return AgentResult(
-            True,
-            "Validation passed.",
-        )
-
     def edit_file(
         self,
         path: str | Path,
@@ -223,29 +170,24 @@ class Agent:
     ) -> AgentResult:
         """
         Generate an AI edit, preview the diff,
-        apply it, and validate the result.
+        apply it, validate it, and repair it when necessary.
         """
 
+        path_string = str(path)
+
         plan = self.planner.plan_edit(
-            str(path),
+            path_string,
             instruction,
         )
 
         console.print("\n[bold cyan]Execution Plan[/bold cyan]")
-        console.print(
-            f"[bold]Objective:[/bold] {plan.objective}\n"
-        )
+        console.print(f"[bold]Objective:[/bold] {plan.objective}\n")
 
         for step in plan.steps:
-            console.print(
-                f"• {step.path} - {step.reason}"
-            )
+            console.print(f"• {step.path} - {step.reason}")
 
         if not Confirm.ask("\nProceed with this plan?"):
-            return AgentResult(
-                False,
-                "Cancelled.",
-            )
+            return AgentResult(False, "Cancelled.")
 
         try:
             original = self.editor.read_file(path)
@@ -257,7 +199,7 @@ class Agent:
 
         try:
             updated = self.chat.generate_file_edit(
-                str(path),
+                path_string,
                 original,
                 instruction,
             )
@@ -268,10 +210,7 @@ class Agent:
             )
 
         if not updated:
-            return AgentResult(
-                False,
-                "Model returned no edit.",
-            )
+            return AgentResult(False, "Model returned no edit.")
 
         try:
             proposal = self.editor.propose_file_edit(
@@ -293,16 +232,10 @@ class Agent:
         )
 
         if proposal.original_content == proposal.new_content:
-            return AgentResult(
-                True,
-                "No changes required.",
-            )
+            return AgentResult(True, "No changes required.")
 
         if not Confirm.ask("Apply changes?"):
-            return AgentResult(
-                False,
-                "Cancelled.",
-            )
+            return AgentResult(False, "Cancelled.")
 
         try:
             self.editor.apply_changes(
@@ -312,28 +245,310 @@ class Agent:
         except Exception as exc:
             return AgentResult(
                 False,
-                (
-                    f"Could not apply changes to "
-                    f"{proposal.path}: {exc}"
-                ),
+                f"Could not apply changes to {proposal.path}: {exc}",
             )
 
         ok(f"Updated {proposal.path}")
 
-        validation = self.validate_changes()
+        validation_result = self.validate_and_repair(
+            instruction=instruction,
+            paths=[proposal.path],
+        )
 
-        if not validation.success:
-            warn(validation.message)
+        if not validation_result.success:
+            return validation_result
 
-            return AgentResult(
-                False,
-                (
-                    f"Updated {proposal.path}, "
-                    "but validation failed."
+        return AgentResult(True, "Applied and validated.")
+
+    def validate_command(
+        self,
+        validation_command: ValidationCommand,
+    ) -> ValidationResult:
+        """
+        Run one safe validation command and preserve its full result.
+        """
+
+        command = validation_command.command
+
+        try:
+            result = self.terminal.run_safe(command)
+        except Exception as exc:
+            message = f"Validation could not run: {exc}"
+
+            console.print(
+                Panel(
+                    message,
+                    title=(
+                        f"Validation: "
+                        f"{validation_command.description}"
+                    ),
+                    border_style="red",
+                )
+            )
+
+            return ValidationResult(
+                success=False,
+                command=command,
+                output=message,
+                exit_code=None,
+                message=message,
+            )
+
+        output_parts = []
+
+        if result.stdout.strip():
+            output_parts.append(result.stdout.strip())
+
+        if result.stderr.strip():
+            output_parts.append(result.stderr.strip())
+
+        output = "\n\n".join(output_parts) or "No output."
+
+        console.print(
+            Panel(
+                output,
+                title=(
+                    f"Validation: "
+                    f"{validation_command.description}"
+                ),
+                subtitle=command,
+                border_style=(
+                    "green"
+                    if result.success
+                    else "red"
+                ),
+            )
+        )
+
+        if not result.success:
+            return ValidationResult(
+                success=False,
+                command=command,
+                output=output,
+                exit_code=result.exit_code,
+                message=(
+                    f"Validation failed with exit code "
+                    f"{result.exit_code}."
                 ),
             )
 
+        return ValidationResult(
+            success=True,
+            command=command,
+            output=output,
+            exit_code=result.exit_code,
+            message="Validation passed.",
+        )
+
+    def validate_and_repair(
+        self,
+        instruction: str,
+        paths: list[str],
+        max_attempts: int = DEFAULT_MAX_REPAIR_ATTEMPTS,
+    ) -> AgentResult:
+        """
+        Run all applicable validators and repair failing files.
+        """
+
+        commands = self.validator.build_commands(paths)
+        unsupported = self.validator.unsupported_paths(paths)
+
+        if unsupported:
+            warn(
+                "No automatic validator configured for: "
+                + ", ".join(unsupported)
+            )
+
+        if not commands:
+            return AgentResult(
+                True,
+                (
+                    "Changes applied, but no automatic validator "
+                    "was available for the changed file types."
+                ),
+            )
+
+        for validation_command in commands:
+            validation = self.validate_command(validation_command)
+
+            if validation.success:
+                continue
+
+            if validation.exit_code is None:
+                return AgentResult(
+                    False,
+                    validation.message,
+                )
+
+            repair_result = self._repair_failed_validation(
+                instruction=instruction,
+                validation_command=validation_command,
+                validation=validation,
+                max_attempts=max_attempts,
+            )
+
+            if not repair_result.success:
+                return repair_result
+
         return AgentResult(
             True,
-            "Applied and validated.",
+            "All available validation commands passed.",
         )
+
+    def _repair_failed_validation(
+        self,
+        instruction: str,
+        validation_command: ValidationCommand,
+        validation: ValidationResult,
+        max_attempts: int,
+    ) -> AgentResult:
+        """
+        Repair files associated with one failing validation command.
+        """
+
+        warn(validation.message)
+
+        for attempt in range(1, max_attempts + 1):
+            console.print(
+                f"\n[bold yellow]Repair attempt "
+                f"{attempt}/{max_attempts}[/bold yellow]"
+            )
+
+            repair_paths = self._select_repair_paths(
+                validation_command.paths,
+                validation.output,
+            )
+
+            repair_proposals = []
+
+            for path in repair_paths:
+                try:
+                    current_content = self.editor.read_file(path)
+                except Exception as exc:
+                    return AgentResult(
+                        False,
+                        f"Could not read {path} for repair: {exc}",
+                    )
+
+                try:
+                    repaired_content = self.chat.generate_repair_edit(
+                        path=path,
+                        current_content=current_content,
+                        original_instruction=instruction,
+                        validation_command=validation.command,
+                        validation_output=validation.output,
+                        attempt=attempt,
+                        max_attempts=max_attempts,
+                    )
+                except Exception as exc:
+                    return AgentResult(
+                        False,
+                        f"Could not generate repair for {path}: {exc}",
+                    )
+
+                if not repaired_content:
+                    warn(f"Model returned no repair for {path}.")
+                    continue
+
+                try:
+                    proposal = self.editor.propose_file_edit(
+                        path,
+                        repaired_content,
+                    )
+                except Exception as exc:
+                    return AgentResult(
+                        False,
+                        f"Could not prepare repair diff for {path}: {exc}",
+                    )
+
+                if proposal.original_content != proposal.new_content:
+                    repair_proposals.append(proposal)
+
+            if not repair_proposals:
+                return AgentResult(
+                    False,
+                    (
+                        "Validation failed and the model produced "
+                        "no repair changes."
+                    ),
+                )
+
+            for proposal in repair_proposals:
+                console.print(
+                    Panel(
+                        proposal.diff or "No changes.",
+                        title=(
+                            f"Repair Diff {attempt}/{max_attempts}: "
+                            f"{proposal.path}"
+                        ),
+                        border_style="yellow",
+                    )
+                )
+
+            if not Confirm.ask(
+                (
+                    f"Apply repair attempt {attempt} to "
+                    f"{len(repair_proposals)} file(s)?"
+                )
+            ):
+                return AgentResult(False, "Repair cancelled.")
+
+            try:
+                self.editor.apply_proposals(repair_proposals)
+            except Exception as exc:
+                return AgentResult(
+                    False,
+                    f"Could not apply repair: {exc}",
+                )
+
+            for proposal in repair_proposals:
+                ok(f"Repaired {proposal.path}")
+
+            validation = self.validate_command(
+                validation_command
+            )
+
+            if validation.success:
+                ok(
+                    f"Validation passed after repair "
+                    f"attempt {attempt}."
+                )
+
+                return AgentResult(
+                    True,
+                    (
+                        f"Validation passed after "
+                        f"{attempt} repair attempt(s)."
+                    ),
+                )
+
+            warn(validation.message)
+
+        return AgentResult(
+            False,
+            (
+                f"Validation still failed after "
+                f"{max_attempts} repair attempts."
+            ),
+        )
+
+    def _select_repair_paths(
+        self,
+        paths: list[str],
+        validation_output: str,
+    ) -> list[str]:
+        """
+        Prefer changed files explicitly named in validation output.
+
+        If no path is mentioned, repair all files tied to the command.
+        """
+
+        normalized_output = validation_output.replace("\\", "/")
+
+        mentioned_paths = [
+            path
+            for path in paths
+            if path.replace("\\", "/") in normalized_output
+        ]
+
+        return mentioned_paths or paths
