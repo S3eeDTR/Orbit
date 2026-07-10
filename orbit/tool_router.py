@@ -36,6 +36,9 @@ class ToolRouter:
         if self._handle_workspace_action(text):
             return ToolResult(handled=True)
 
+        if self._handle_search_action(text):
+            return ToolResult(handled=True)
+
         if self._handle_ai_edit(text):
             return ToolResult(handled=True)
 
@@ -46,7 +49,126 @@ class ToolRouter:
             return ToolResult(handled=True)
 
         return ToolResult(handled=False)
+    
+    # ------------------------------------------------------------------
+    # Read and search actions
+    # ------------------------------------------------------------------
 
+    def _handle_search_action(self, text: str) -> bool:
+        value = text.strip()
+
+        # ---------------------------------------------------------
+        # Read file
+        # ---------------------------------------------------------
+
+        read_match = re.match(
+            r"^(read|show|open)\s+([A-Za-z0-9_./\\-]+)$",
+            value,
+            flags=re.IGNORECASE,
+        )
+
+        if read_match:
+            path = read_match.group(2)
+
+            try:
+                content = self.editor.workspace.read_file(path)
+            except FileNotFoundError:
+                warn(f"File not found: {path}")
+                return True
+            except IsADirectoryError:
+                warn(f"Path is a directory: {path}")
+                return True
+            except Exception as exc:
+                warn(str(exc))
+                return True
+
+            console.print(
+                Panel(
+                    content or "[dim]Empty file.[/dim]",
+                    title=f"File: {path}",
+                    border_style="cyan",
+                )
+            )
+
+            return True
+
+        # ---------------------------------------------------------
+        # Find files
+        # ---------------------------------------------------------
+
+        find_match = re.match(
+            r"^(find\s+files?|find\s+files?\s+named)\s+(.+)$",
+            value,
+            flags=re.IGNORECASE,
+        )
+
+        if find_match:
+            pattern = find_match.group(2).strip()
+
+            try:
+                matches = self.editor.workspace.find_files(pattern)
+            except Exception as exc:
+                warn(str(exc))
+                return True
+
+            if not matches:
+                warn(f"No files found matching '{pattern}'.")
+                return True
+
+            output = "\n".join(
+                f"{index}. {path}"
+                for index, path in enumerate(matches, start=1)
+            )
+
+            console.print(
+                Panel(
+                    output,
+                    title=f"Files matching: {pattern}",
+                    border_style="cyan",
+                )
+            )
+
+            return True
+
+        # ---------------------------------------------------------
+        # Search / grep text
+        # ---------------------------------------------------------
+
+        search_match = re.match(
+            r"^(search\s+for|search|grep)\s+(.+)$",
+            value,
+            flags=re.IGNORECASE,
+        )
+
+        if search_match:
+            query = search_match.group(2).strip()
+
+            try:
+                matches = self.editor.workspace.search_text(query)
+            except Exception as exc:
+                warn(str(exc))
+                return True
+
+            if not matches:
+                warn(f"No matches found for '{query}'.")
+                return True
+
+            output = "\n".join(
+                f"{match.path}:{match.line_number}: {match.line}"
+                for match in matches
+            )
+
+            console.print(
+                Panel(
+                    output,
+                    title=f"Search: {query}",
+                    border_style="cyan",
+                )
+            )
+
+            return True
+
+        return False
     # ------------------------------------------------------------------
     # Workspace actions
     # ------------------------------------------------------------------
@@ -254,7 +376,7 @@ class ToolRouter:
             if not result.success:
                 warn(result.message)
 
-            return True
+            return False
         # ---------------------------------------------------------
         # Planner mode (no explicit file)
         # ---------------------------------------------------------
