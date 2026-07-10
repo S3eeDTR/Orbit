@@ -67,7 +67,13 @@ class Planner:
         request: str,
         limit: int = 80,
     ) -> Plan:
-        entries = self.project_map.build(limit)
+        try:
+            entries = self.project_map.build(limit)
+        except Exception:
+            return Plan(objective=request, steps=[])
+
+        if not entries:
+            return Plan(objective=request, steps=[])
 
         files = "\n\n".join(
             f"{entry.path}\nDescription: {entry.description}"
@@ -75,38 +81,41 @@ class Planner:
         )
 
         prompt = f"""
-            You are ORBIT's planning engine.
+You are ORBIT's planning engine.
 
-            Your ONLY job is to decide which files must be modified to complete the user's request.
+Your ONLY job is to decide which files must be modified to complete the user's request.
 
-            User request:
-            {request}
+User request:
+{request}
 
-            Project files:
-            {files}
+Project files:
+{files}
 
-            Instructions:
+Instructions:
 
-            - Select the smallest practical set of files, usually 1-3 files.
-            - Return at most 3 files unless the request clearly requires more.
-            - Include ONLY files that require code changes.
-            - Do NOT include files that are merely related.
-            - Prefer precision over completeness.
-            - If a change can be made in one file, return one file.
-            - Only return multiple files when they are all required.
-            - Never invent file paths.
-            - Use only the files listed above.
+- Select the smallest practical set of files, usually 1-3 files.
+- Return at most 3 files unless the request clearly requires more.
+- Include ONLY files that require code changes.
+- Do NOT include files that are merely related.
+- Prefer precision over completeness.
+- If a change can be made in one file, return one file.
+- Only return multiple files when they are all required.
+- Never invent file paths.
+- Use only the files listed above.
 
-            Output format:
-            One file path per line.
+Output format:
+One file path per line.
 
-            Do not explain.
-            Do not use markdown.
-            Do not use bullets.
-            Return nothing if no suitable file exists.
-            """
+Do not explain.
+Do not use markdown.
+Do not use bullets.
+Return nothing if no suitable file exists.
+"""
 
-        reply = self.chat.complete_once(prompt)
+        try:
+            reply = self.chat.complete_once(prompt)
+        except Exception:
+            return Plan(objective=request, steps=[])
 
         if not reply:
             return Plan(objective=request, steps=[])

@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import re
@@ -6,7 +7,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .chat import ChatSession
-from .terminal import Terminal
 from .client import OpenRouterClient
 from .config import Config, save_config
 from .models import model_id_from_argument, print_models
@@ -17,24 +17,30 @@ from .project import (
     save_index,
     scan_project,
 )
+from .project_map import ProjectMap
 from .sessions import save_session
+from .terminal import Terminal
 from .ui import console, ok, warn
+from .workspace import Workspace
+
 
 HELP_TEXT = """
 [bold cyan]Commands[/bold cyan]
-  /help             Show this help menu
-  /clear            Clear conversation history
-  /model            Interactive model picker
-  /model <number>   Switch using number from /models
-  /model <id>       Switch using exact OpenRouter model ID
-  /models           List available models
-  /run <command>    Run terminal commands
-  /index            Scan project files
-  /files            Show indexed files
-  /init             Create ORBIT.md project instructions
-  /save             Save current chat session
-  /stats            Show session statistics
-  /exit             Exit
+  /help               Show this help menu
+  /clear              Clear conversation history
+  /model              Interactive model picker
+  /model <number>     Switch using number from /models
+  /model <id>         Switch using exact OpenRouter model ID
+  /models             List available models
+  /run <command>      Run terminal commands
+  /index              Update new and changed project files
+  /index --refresh    Rebuild the complete project index
+  /index --changed    Re-index only new and changed files
+  /files              Show indexed files
+  /init               Create ORBIT.md project instructions
+  /save               Save current chat session
+  /stats              Show session statistics
+  /exit               Exit
 
 [bold cyan]Project usage[/bold cyan]
   explain @main.py
@@ -120,10 +126,42 @@ def handle_command(
         print_models(config, client)
 
     elif command == "/index":
+        valid_arguments = {"", "--refresh", "--changed"}
+
+        if argument not in valid_arguments:
+            warn("Usage: /index [--refresh | --changed]")
+            return True
+
+        # Refresh the basic project file list first so new and deleted files
+        # are reflected before updating the semantic project map.
         new_info = scan_project(project.root)
         project.files[:] = new_info.files
         save_index(project)
-        ok(f"Indexed {project.file_count} files.")
+
+        try:
+            workspace = Workspace(project.root)
+
+            project_map = ProjectMap(
+                project=project,
+                workspace=workspace,
+                chat=chat,
+            )
+
+            entries = project_map.index(
+                refresh=argument == "--refresh",
+                changed_only=argument == "--changed",
+            )
+
+        except Exception as exc:
+            warn(f"Project indexing failed: {exc}")
+            return True
+
+        if argument == "--refresh":
+            ok(f"Rebuilt project index for {len(entries)} files.")
+        elif argument == "--changed":
+            ok(f"Updated changed project files. Index contains {len(entries)} files.")
+        else:
+            ok(f"Updated project index for {len(entries)} files.")
 
     elif command == "/files":
         table = Table(
@@ -143,6 +181,7 @@ def handle_command(
             console.print(
                 f"[dim]Showing first 100 of {project.file_count} files.[/dim]"
             )
+
     elif command == "/run":
         if not argument:
             warn("Usage: /run <command>")
@@ -158,10 +197,23 @@ def handle_command(
         console.print(f"[bold cyan]Exit code:[/bold cyan] {result.exit_code}")
 
         if result.stdout:
-            console.print(Panel(result.stdout, title="stdout", border_style="green"))
+            console.print(
+                Panel(
+                    result.stdout,
+                    title="stdout",
+                    border_style="green",
+                )
+            )
 
         if result.stderr:
-            console.print(Panel(result.stderr, title="stderr", border_style="red"))
+            console.print(
+                Panel(
+                    result.stderr,
+                    title="stderr",
+                    border_style="red",
+                )
+            )
+
     elif command == "/init":
         path = create_instructions(project.root)
         chat.reset_system_prompt()
